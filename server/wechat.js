@@ -123,7 +123,7 @@ function createWechat({settings,store,auth,fetch:fetchImpl=global.fetch,now=()=>
     // second trade number, even when the first response was lost.
     const outTradeNo=tradeNo('P');
     const request={
-      body:clip(order.lines.map(line=>line.name).join('、')||'爪爪小铺订单'),openid:actor.openid,out_trade_no:outTradeNo,
+      body:clip(order.lines.map(line=>line.name).join('、')||'奇迹空间订单'),openid:actor.openid,out_trade_no:outTradeNo,
       spbill_create_ip:cloud.ip,sub_mch_id:config.mchId,total_fee:order.total,attach:order.id,trade_type:'JSAPI',
       env_id:cloud.envId,callback_type:2,container:{service:cloud.service,path:'/wechat/pay/notify'}
     };
