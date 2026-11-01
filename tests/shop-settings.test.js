@@ -1,3 +1,4 @@
+require('../cloudfunctions/shop/studio').pickupStore.phone='13800000000';
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const domain=require('../cloudfunctions/shop/domain');

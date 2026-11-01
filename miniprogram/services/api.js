@@ -35,7 +35,7 @@ async function request(endpoint,data){
   }
  }
 }
-async function login(username,password){if(cloud)throw Error('云托管使用微信身份，不需要测试账号');const out=await request('/auth/login',{username,password});if(out.identity.merchant)throw Error('小程序请使用买家测试账号，商家账号用于网页后台');const previous=session();if(previous?.id!==out.identity.id)wx.removeStorageSync('pet-cart');wx.setStorageSync(key,{apiBase:base(),token:out.token,id:out.identity.id});return out.identity;}
+async function login(username,password){if(cloud)throw Error('云托管使用微信身份，不需要账号');const out=await request('/auth/login',{username,password});if(out.identity.merchant)throw Error('小程序请使用买家账号，商家账号用于网页后台');const previous=session();if(previous?.id!==out.identity.id)wx.removeStorageSync('pet-cart');wx.setStorageSync(key,{apiBase:base(),token:out.token,id:out.identity.id});return out.identity;}
 async function logout(){if(cloud){wx.removeStorageSync('pet-cart');return;}try{await request('/auth/logout',{});}finally{wx.removeStorageSync(key);wx.removeStorageSync('pet-cart');}}
 async function call(action,input={}){return paths(await request('/api',{action,input}));}
 function requestPayment(params){return new Promise((resolve,reject)=>{if(!params){resolve();return;}wx.requestPayment({timeStamp:String(params.timeStamp),nonceStr:params.nonceStr,package:params.package,signType:params.signType||'RSA',paySign:params.paySign,success:resolve,fail:err=>reject(Error(err&&err.errMsg&&err.errMsg.includes('cancel')?'已取消支付':(err&&err.errMsg)||'支付未完成'))});});}

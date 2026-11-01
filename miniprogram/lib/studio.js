@@ -2,13 +2,13 @@
 const assets=[['hero-v2','猫狗日常','横幅'],['hero-calm-v3','午后猫咪','横幅'],['cat-v2','猫咪肖像','分类'],['dog-v2','狗狗肖像','分类'],['food-v2','主粮示意','商品'],['toy-v2','绳结玩具','商品'],['care-v2','日常梳理','商品'],['empty-v2','猫咪与收纳篮','场景'],['bowl-v3','陶瓷食碗','商品'],['bed-v3','柔软窝垫','商品'],['snack-v3','冻干零食','商品']].map(([id,name,kind])=>({id,name,kind,src:'/assets/'+id+'.jpg'}));
 const slots=[{key:'hero',name:'首页主视觉',hint:'建议横向构图，左侧留空放标题'},{key:'cat',name:'主粮分类图片',hint:'建议正方形，主体居中'},{key:'dog',name:'玩具分类图片',hint:'建议正方形，主体居中'},{key:'care',name:'清洁分类图片',hint:'建议正方形，主体居中'},{key:'toy',name:'全部好物图片',hint:'建议正方形，主体居中'},{key:'avatar',name:'个人中心欢迎图',hint:'建议正方形，主体居中'},{key:'empty',name:'空购物车图片',hint:'建议清晰简洁的场景图片'}];
 const defaults={hero:'/assets/hero-v2.jpg',cat:'/assets/cat-v2.jpg',dog:'/assets/dog-v2.jpg',care:'/assets/care-v2.jpg',toy:'/assets/toy-v2.jpg',avatar:'/assets/cat-v2.jpg',empty:'/assets/empty-v2.jpg'};
-const afterStages={REQUESTED:'售后待审核',REJECTED:'售后已拒绝',WITHDRAWN:'售后已撤回',WAIT_RETURN:'待买家退货',RETURN_TRANSIT:'退货待验收',WAIT_REFUND:'待模拟退款',REFUND_FAILED:'模拟退款失败',SUCCEEDED:'退款完成'};
+const afterStages={REQUESTED:'售后待审核',REJECTED:'售后已拒绝',WITHDRAWN:'售后已撤回',WAIT_RETURN:'待买家退货',RETURN_TRANSIT:'退货待验收',WAIT_REFUND:'待退款记录',REFUND_FAILED:'退款记录失败',SUCCEEDED:'退款完成'};
 const pets=['待确认','猫咪','狗狗','通用'];
 const simulationNotes=[
- '当前全部为模拟体验，不发生真实付款、配送或退款。请勿按示例门店或退货地址到店、寄件。',
- '请使用虚构的收货人、电话、地址和可公开的示意图片。测试账号、商品、收货信息、订单及售后记录会保存到共享服务，用于联调和故障排查。',
+ '此模式不发生真实付款或退款。到店或寄件前，请核对门店提供的信息。',
+ '请使用虚构的收货人、电话、地址和可公开的示意图片。账号、商品、收货信息、订单及售后记录会保存到共享服务，用于联调和故障排查。',
  '买家账号只能查看自己的订单；商家账号可以查看处理订单所需的收货信息。不要把商家账号提供给买家使用。',
- '退出登录会清除当前登录状态，不会删除已保存的测试记录。记录会保留并备份，如需清理，请联系分配测试账号的维护者。'
+ '退出登录会清除当前登录状态，不会删除已保存的使用记录。记录会保留并备份，如需清理，请联系分配账号的维护者。'
 ];
 const homeDefaults={headline:'奇迹空间\n宠物咖啡店',subtitle:'宠物百货、咖啡烘焙店',featuredTitle:'店主精选',featuredIntro:'从吃饭到玩耍，把日常照顾得刚刚好。',newTitle:'上新小货架',scenes:[{key:'meal',category:'主粮',title:'把饭点变成期待',text:'主粮按需选，日常好好吃',image:'food-v2'},{key:'play',category:'玩具',title:'今天，陪它玩一会儿',text:'把陪伴放进日常',image:'toy-v2'},{key:'care',category:'清洁',title:'蓬松干净的小日子',text:'梳理与清洁，一起慢慢来',image:'care-v2'}]};
 function petOf(p){return p.petScope||({food:'猫咪',toy:'通用',care:'通用'}[p.id])||'待确认';}
@@ -28,7 +28,7 @@ function withImage(p,src){const images=productImages(p).filter(x=>x!==src);if(im
 function withoutImage(p,index){const images=productImages(p);images.splice(index,1);return {image:images[0]||'',images};}
 function cents(value){const s=String(value).trim();if(!/^\d+(\.\d{1,2})?$/.test(s))throw Error('售价请填写大于 0 的金额，最多两位小数');const [a,b='']=s.split('.');const n=Number(a)*100+Number(b.padEnd(2,'0'));if(!Number.isSafeInteger(n)||n<=0||n>10000000)throw Error('售价须在 0.01～100000 元之间');return n;}
 function images(target){return assets.filter(a=>target==='hero'?a.kind==='横幅':target==='empty'?a.kind==='场景'||a.kind==='分类':target==='avatar'?a.kind==='分类':target==='product'?a.kind==='商品':a.kind!=='横幅'&&a.kind!=='场景');}
-const pickupStore={name:'奇迹空间宠物咖啡店',detail:'示例市花园路 18 号（模拟地址）',hours:'每日 10:00—20:00',phone:'13800000000'};
+const pickupStore={name:'奇迹空间宠物咖啡店',detail:'门店地址待配置',hours:'每日 10:00—20:00',phone:''};
 const issueLabels={OUT_OF_STOCK:'缺货待处理',DELIVERY_FAILED:'外送未送达',PICKUP_DELAY:'自提延期',CONTACT_UNREACHABLE:'联系未果'};
 function fulfillmentLabel(o){if(o.fulfillment?.issue?.status==='OPEN'&&['PAID','SHIPPED'].includes(o.status))return issueLabels[o.fulfillment.issue.type]||'履约待处理';if(o.fulfillment?.type==='PICKUP'){if(o.status==='PAID')return o.fulfillment.readyAt?'待到店自提':'门店备货中';if(o.status==='COMPLETED')return '已自提';}return ({PAID:'商家备货中',SHIPPED:'商家配送中'})[o.status]||'';}
 return {assets,slots,defaults,templates,create,cents,images,pets,simulationNotes,homeDefaults,petOf,featuredOf,matches,homeProducts,productImages,withImage,withoutImage,afterStages,pickupStore,fulfillmentLabel,issueLabels};

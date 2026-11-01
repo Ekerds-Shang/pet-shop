@@ -1,3 +1,4 @@
+require('../cloudfunctions/shop/studio').pickupStore.phone='13800000000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -387,7 +388,7 @@ test('履约进度保留已发生的自提和收货，售后不抹去完成记�
 
 test('支付提示按服务配置显示，网络失败不会退回模拟承诺',async()=>{
  const f=fixture();
- for(const [health,expected,label] of [[{ok:true,mode:'wechat',wechatPay:true},'wechat','微信支付已配置'],[{ok:true,mode:'simulation',wechatPay:false},'simulation','模拟经营'],[{ok:true,mode:'wechat',wechatPay:false},'unknown','支付状态待核实']]){
+ for(const [health,expected,label] of [[{ok:true,mode:'wechat',wechatPay:true},'wechat','微信支付已配置'],[{ok:true,mode:'simulation',wechatPay:false},'simulation','支付尚未启用'],[{ok:true,mode:'wechat',wechatPay:false},'unknown','支付状态待核实']]){
   f.run(`fetch=async()=>({status:200,json:async()=>(${JSON.stringify(health)})});`);
   await f.run('refreshPaymentMode()');assert.equal(f.run('paymentMode'),expected);assert.equal(f.node('payment-mode-title').textContent,label);
  }
@@ -400,5 +401,5 @@ test('真实付款售后明确提示资金且退货地址不预填模拟资料',
  f.run(`currentOrder=${JSON.stringify(order)}`);
  const html=f.run('renderAftersales(currentOrder)');assert.match(html,/待微信退款/);assert.match(html,/提交微信退款/);assert.doesNotMatch(html,/待模拟退款|完成模拟退款|不涉及真实资金/);
  const fields=f.run('returnAddressFields(currentOrder)');assert.match(fields,/实际接收退货/);assert.doesNotMatch(fields,/13800000000|模拟省|模拟退货收件人/);
- f.run("currentOrder.payment.provider='MOCK'");assert.match(f.run('renderAftersales(currentOrder)'),/完成模拟退款/);assert.match(f.run('returnAddressFields(currentOrder)'),/模拟退货收件人/);
+ f.run("currentOrder.payment.provider='MOCK'");assert.match(f.run('renderAftersales(currentOrder)'),/完成退款记录/);assert.doesNotMatch(f.run('returnAddressFields(currentOrder)'),/13800000000|模拟退货收件人/);
 });

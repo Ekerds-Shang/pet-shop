@@ -1,3 +1,4 @@
+require('../cloudfunctions/shop/studio').pickupStore.phone='13800000000';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const domain=require('../cloudfunctions/shop/domain'),studio=require('../cloudfunctions/shop/studio');
 function fixture(){let state=domain.seed(),page;const calls=[],errors=[],confirms=[],storage={};let approve=true,dropResponse=false;

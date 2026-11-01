@@ -50,11 +50,11 @@ function handle(state,actor,action,input,options,{release,address,reservedStock}
   r.stage='WAIT_REFUND';event('商家验收退货并记账',note);return o;
  }
  if(action==='refundFail'){
-  const reason=text(input.reason,'失败原因');if(r.stage==='REFUND_FAILED'&&r.failureReason===reason)return o;requireValue(o.status==='REFUNDING'&&['WAIT_REFUND','REFUND_FAILED'].includes(r.stage),'当前不能模拟退款失败');r.stage='REFUND_FAILED';r.failureReason=reason;event('模拟退款失败',reason);return o;
+  const reason=text(input.reason,'失败原因');if(r.stage==='REFUND_FAILED'&&r.failureReason===reason)return o;requireValue(o.status==='REFUNDING'&&['WAIT_REFUND','REFUND_FAILED'].includes(r.stage),'当前不能退款记录失败');r.stage='REFUND_FAILED';r.failureReason=reason;event('退款记录失败',reason);return o;
  }
  if(action==='mockRefund'){
   if(o.status==='REFUNDED')return o;requireValue(o.status==='REFUNDING'&&['WAIT_REFUND','REFUND_FAILED'].includes(r.stage),'退货尚未验收，不能退款');
-  if(r.stockDisposition)fulfillment.settleStock(state,o,actor,now,reservedStock);else if(r.previous==='PAID')release(state,o);o.status='REFUNDED';fulfillment.finishIssue(o,now,'REFUNDED','整单退款完成，履约结束');r.status='SUCCEEDED';r.stage='SUCCEEDED';r.provider='MOCK';r.refundedAt=now;event('模拟退款成功','整单退还 ¥'+(r.amount/100).toFixed(2)+'，未产生真实资金流');return o;
+  if(r.stockDisposition)fulfillment.settleStock(state,o,actor,now,reservedStock);else if(r.previous==='PAID')release(state,o);o.status='REFUNDED';fulfillment.finishIssue(o,now,'REFUNDED','整单退款完成，履约结束');r.status='SUCCEEDED';r.stage='SUCCEEDED';r.provider='MOCK';r.refundedAt=now;event('退款记录成功','整单退还 ¥'+(r.amount/100).toFixed(2)+'，未产生真实资金流');return o;
  }
  throw Error('UNKNOWN_ACTION');
 }
