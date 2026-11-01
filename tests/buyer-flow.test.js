@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const studio=require('../miniprogram/lib/studio');
 const event=dataset=>({currentTarget:{dataset}});
-function fixture(){let p;const calls=[],modals=[],storage={},products=[{id:'p',name:'测试商品',category:'用品',description:'日常用品',image:'/assets/toy-v2.jpg',skus:[{id:'s',name:'标准',price:2000,stock:3}]}],addresses=[{id:'a',name:'测试',phone:'13800000000',detail:'虚构街道 1 号'}];const settings=require('../cloudfunctions/shop/shop-settings').publicSettings(require('../cloudfunctions/shop/domain').seed(),Date.now());const api={mode:'api',hasSession:()=>true,checkoutScope:()=>'buyer-flow-checkout',call:async(action,input)=>{calls.push({action,input});if(action==='quoteOrder'){const subtotal=input.lines.reduce((sum,l)=>sum+products.find(p=>p.id===l.productId).skus.find(k=>k.id===l.skuId).price*l.qty,0),shippingFee=input.fulfillment==='PICKUP'?0:800;return {subtotal,shippingFee,total:subtotal+shippingFee,fulfillment:input.fulfillment,settingsRevision:settings.revision,pickupStore:settings.pickupStore,delivery:settings.delivery};}return ({shopSettings:settings,catalog:products,addresses,identity:{merchant:false},storefront:studio.defaults,homeContent:studio.homeDefaults,saveAddress:addresses[0],ordersPage:{items:[],page:1,pages:1,total:0}})[action];}};const wx={getStorageSync:k=>storage[k],setStorageSync:(k,v)=>storage[k]=v,showToast(){},showModal:o=>{modals.push(o.content);o.success?.({confirm:wx.accept!==false});},stopPullDownRefresh(){}};const helper={module:{exports:{}},wx};vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/services/checkout'),'utf8'),helper);const ctx={Page:d=>p=d,require:n=>n.includes('studio')?studio:n.includes('checkout')?helper.module.exports:api,wx,setInterval:()=>1,clearInterval(){}};vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/pages/shop/index'),'utf8'),ctx);p.setData=function(values){for(const [key,value] of Object.entries(values)){const parts=key.replace(/\[(\d+)\]/g,'.$1').split('.');let obj=this.data;for(const k of parts.slice(0,-1))obj=obj[k]||(obj[k]={});obj[parts.at(-1)]=value;}};return {p,api,wx,calls,modals,products,addresses};}
+function fixture(){let p;const app={globalData:{orderEntry:null}};const calls=[],modals=[],storage={},products=[{id:'p',name:'测试商品',category:'用品',description:'日常用品',image:'/assets/toy-v2.jpg',skus:[{id:'s',name:'标准',price:2000,stock:3}]}],addresses=[{id:'a',name:'测试',phone:'13800000000',detail:'虚构街道 1 号'}];const settings=require('../cloudfunctions/shop/shop-settings').publicSettings(require('../cloudfunctions/shop/domain').seed(),Date.now());const api={mode:'api',hasSession:()=>true,checkoutScope:()=>'buyer-flow-checkout',call:async(action,input)=>{calls.push({action,input});if(action==='quoteOrder'){const subtotal=input.lines.reduce((sum,l)=>sum+products.find(p=>p.id===l.productId).skus.find(k=>k.id===l.skuId).price*l.qty,0),shippingFee=input.fulfillment==='PICKUP'?0:800;return {subtotal,shippingFee,total:subtotal+shippingFee,fulfillment:input.fulfillment,settingsRevision:settings.revision,pickupStore:settings.pickupStore,delivery:settings.delivery};}return ({shopSettings:settings,catalog:products,addresses,identity:{merchant:false},storefront:studio.defaults,homeContent:studio.homeDefaults,saveAddress:addresses[0],ordersPage:{items:[],page:1,pages:1,total:0}})[action];}};const wx={getStorageSync:k=>storage[k],setStorageSync:(k,v)=>storage[k]=v,showToast(){},showModal:o=>{modals.push(o.content);o.success?.({confirm:wx.accept!==false});},stopPullDownRefresh(){}};const helper={module:{exports:{}},wx};vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/services/checkout'),'utf8'),helper);const ctx={getApp:()=>app,Page:d=>p=d,require:n=>n.includes('studio')?studio:n.includes('checkout')?helper.module.exports:api,wx,setInterval:()=>1,clearInterval(){}};vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/pages/shop/index'),'utf8'),ctx);p.setData=function(values){for(const [key,value] of Object.entries(values)){const parts=key.replace(/\[(\d+)\]/g,'.$1').split('.');let obj=this.data;for(const k of parts.slice(0,-1))obj=obj[k]||(obj[k]={});obj[parts.at(-1)]=value;}};return {p,api,wx,calls,modals,products,addresses,app};}
 async function idle(p){for(let i=0;i<50&&p.data.busy;i++)await new Promise(r=>setImmediate(r));assert.equal(p.data.busy,false);}
 const refreshedOrder={id:'refresh-order',status:'SHIPPED',lines:[],subtotal:0,total:800,shippingFee:800,createdAt:1,updatedAt:2,shipping:{number:'SIM-DELIVERY'},fulfillment:{type:'DELIVERY'}};
 for(const trigger of ['onShow','onPullDownRefresh','retry'])test('小程序 '+trigger+' 同步当前订单详情和列表，保留未提交售后内容',async()=>{
@@ -73,3 +73,38 @@ test('忙碌期间不丢弃超时刷新，操作结束后下一次计时补查',
 test('确认付款期间到期时重新查单并阻止发送模拟付款',async()=>{const f=fixture(),{p,api,calls}=f;const old=api.call;p.data.selectedOrder={id:'late',status:'PENDING',expiresAt:Date.now()-1};api.call=async(action,input)=>{if(action==='order')return {id:'late',status:'EXPIRED',lines:[],total:0,shippingFee:0,createdAt:1,expiresAt:2};return old(action,input);};p.action(event({action:'mockPay'}));await idle(p);assert.equal(p.data.selectedOrder.status,'EXPIRED');assert.ok(!calls.some(c=>c.action==='mockPay'));});
 test('订单展示完整商品件数，售后阶段提供下一步指引',async()=>{const f=fixture(),{p,api}=f;api.call=async action=>action==='ordersPage'?{items:[{id:'o',status:'REFUNDING',lines:[{productId:'p',skuId:'s',name:'第一件',spec:'标准',price:2000,qty:2},{productId:'x',skuId:'x',name:'第二件',spec:'大号',price:100,qty:1}],total:4100,shippingFee:0,createdAt:1,refund:{stage:'WAIT_RETURN'}}],page:1,pages:1,total:1}:null;await p.loadOrderPage();assert.equal(p.data.orders[0].itemCount,3);assert.equal(p.data.orders[0].lines.length,2);assert.equal(p.data.orders[0].lines[0].lineTotalText,'40.00');assert.match(p.data.orders[0].nextStep,/填写运单/);});
 test('未配置客服号码时不拨号也不复制，服务适配器不使用示例电话',()=>{const {p,wx}=fixture();let calls=0;wx.makePhoneCall=()=>calls++;wx.setClipboardData=()=>calls++;p.openSupport();assert.equal(p.data.supportVisible,true);p.callSupport();p.copySupport();assert.equal(calls,0);const context={wx:{},module:{exports:{}},require:()=>({apiBase:'https://shop.example.test'})};vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/services/api'),'utf8'),context);assert.equal(context.module.exports.getSupport().phone,'');});
+
+
+test('微信订单深链读取商户交易号对应详情，不恢复旧结账也不自动支付',async()=>{
+ const {p,api,calls}=fixture();const original=api.call;let recovered=0;
+ api.call=async(action,input)=>{if(action==='orderByTradeNo'){calls.push({action,input});return refreshedOrder;}return original(action,input);};
+ p.recoverCheckout=async()=>{recovered++;};
+ p.onLoad({out_trade_no:'Ptrade123456'});await idle(p);
+ assert.equal(p.data.selectedOrder.id,refreshedOrder.id);assert.equal(p.data.tab,'orders');assert.equal(recovered,0);
+ assert.equal(calls.find(c=>c.action==='orderByTradeNo').input.outTradeNo,'Ptrade123456');
+ assert.ok(!calls.some(c=>['createOrder','payment','paymentSync','mockPay'].includes(c.action)));
+ p.onShow();await idle(p);assert.equal(calls.filter(c=>c.action==='orderByTradeNo').length,1);
+});
+
+test('订单深链等待登录，短暂网络失败可重试，越权或错误链接有明确提示',async()=>{
+ const {p,api,modals}=fixture();api.hasSession=()=>false;api.login=async()=>{};let attempts=0,recovered=0;const original=api.call;
+ api.call=async(action,input)=>{if(action==='orderByTradeNo'){if(++attempts===1)throw Error('网络暂时不可用');return refreshedOrder;}return original(action,input);};
+ p.recoverCheckout=async()=>{recovered++;};p.onLoad({out_trade_no:'Ptrade123456'});await idle(p);
+ assert.equal(p.data.loginRequired,true);assert.equal(attempts,0);
+ p.login();await idle(p);assert.equal(p.pendingOrderTrade,'Ptrade123456');assert.equal(modals.at(-1),'网络暂时不可用');
+ p.retry();await idle(p);assert.equal(p.data.selectedOrder.id,refreshedOrder.id);assert.equal(p.pendingOrderTrade,null);assert.equal(recovered,0);
+ p.pendingOrderTrade='Pother123456';api.call=async action=>{assert.equal(action,'orderByTradeNo');throw Object.assign(Error('ORDER_NOT_FOUND'),{code:'ORDER_NOT_FOUND'});};
+ await assert.rejects(p.openLinkedOrder(),/当前微信账号/);assert.equal(p.pendingOrderTrade,null);
+ p.pendingOrderTrade='${商品订单号}';await assert.rejects(p.openLinkedOrder(),/订单链接无效/);assert.equal(p.pendingOrderTrade,null);
+});
+
+
+test('微信订单入口热启动更新订单，普通前后台切换不重复跳转',async()=>{
+ const {p,api,app}=fixture();const original=api.call;let reads=0;
+ api.call=async(action,input)=>{if(action==='orderByTradeNo'){reads++;return {...refreshedOrder,id:input.outTradeNo};}return original(action,input);};
+ let definition;vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/app'),'utf8'),{App:value=>definition=value,require:()=>({mode:'api'})});
+ definition.globalData=app.globalData;
+ definition.onShow({path:'pages/shop/index',query:{out_trade_no:'Ptrade789012'}});
+ p.onShow();await idle(p);assert.equal(p.data.selectedOrder.id,'Ptrade789012');assert.equal(app.globalData.orderEntry,null);
+ p.close();definition.onShow({path:'pages/shop/index',query:{}});p.onShow();await idle(p);assert.equal(p.data.selectedOrder,null);assert.equal(reads,1);
+});

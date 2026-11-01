@@ -59,3 +59,35 @@ test('关闭后的到账不复活订单，并自动退款',async()=>{let clock=D
 }finally{await fx.close();}});
 
 test('未发货微信退款成功后释放库存，重复退款不重复入库',()=>{let state=domain.seed();const buyer={id:'a',merchant:false},merchant={id:'m',merchant:true};const run=(actor,action,input,options)=>domain.execute(state,actor,action,input,{mock:true,now:1000,...options});const address=run(buyer,'saveAddress',{name:'样例',phone:'13800000000',detail:'样例街道 1 号'}).result;state=run(buyer,'saveAddress',{name:'样例',phone:'13800000000',detail:'样例街道 1 号'}).state;const order=domain.execute(state,buyer,'createOrder',{key:'refund-wechat-1',addressId:address.id,lines:[{productId:'food',skuId:'food-1',qty:1}]},{mock:true,now:1000});state=order.state;state=domain.execute(state,buyer,'mockPay',{id:order.result.id},{mock:true,now:1000}).state;state.orders[0].payment={provider:'WECHAT',transactionId:'tx-refund',amount:state.orders[0].total,outTradeNo:'P1234567890abcdef1234567'};const requested=domain.execute(state,buyer,'refundRequest',{id:order.result.id,reason:'不想要了',type:'REFUND_ONLY'},{mock:true,now:1000});state=requested.state;state=domain.execute(state,merchant,'refundReview',{id:order.result.id,caseId:requested.result.refund.caseId,approve:true,note:'同意退款'},{mock:true,now:1000}).state;const paid=domain.settleVerifiedRefund(state,{eventId:'refund-evt',refundId:'refund-1',orderId:order.result.id,amount:state.orders[0].total,currency:'CNY'},1000);assert.equal(paid.result.status,'REFUNDED');assert.equal(paid.state.products[0].skus[0].stock,20);const again=domain.settleVerifiedRefund(paid.state,{eventId:'refund-evt-2',refundId:'refund-1',orderId:order.result.id,amount:state.orders[0].total,currency:'CNY'},1000);assert.equal(again.result.status,'REFUNDED');assert.equal(again.state.products[0].skus[0].stock,20);assert.throws(()=>domain.settleVerifiedRefund(paid.state,{eventId:'refund-evt',refundId:'other',orderId:order.result.id,amount:state.orders[0].total,currency:'CNY'},1000),/REFUND_EVENT_CONFLICT/);});
+
+
+test('微信订单入口以商户交易号定位本人订单，不泄露支付记录或越权查询',async()=>{
+ const fx=await boot(()=>Date.now());try{
+  const address=await fx.post('/api',{action:'saveAddress',input:{name:'测试买家',phone:'13800000000',detail:'测试地址 8 号'}},undefined,buyerHeaders);
+  const made=await fx.post('/api',{action:'createOrder',input:{key:'order-center-test',addressId:address.body.data.id,lines:[{productId:'food',skuId:'food-1',qty:1}]}},undefined,buyerHeaders);
+  const pay=await fx.post('/api',{action:'payment',input:{id:made.body.data.id}},undefined,buyerHeaders);
+  assert.equal(pay.status,200,JSON.stringify(pay.body));
+  const number=pay.body.data.outTradeNo,request={action:'orderByTradeNo',input:{outTradeNo:number}},calls=fx.calls.length;
+  assert.notEqual(number,made.body.data.id);
+  const own=await fx.post('/api',request,undefined,buyerHeaders);
+  assert.equal(own.status,200);assert.equal(own.body.data.id,made.body.data.id);assert.equal(own.body.data.status,'PENDING');
+  for(const key of ['request','openid','prepayId','wechat','paySign','outTradeNo'])assert.equal(own.body.data[key],undefined);
+  const other=await fx.post('/api',request,undefined,{...buyerHeaders,'x-wx-openid':'another-buyer'});
+  assert.equal(other.body.error,'ORDER_NOT_FOUND');
+  for(const value of [made.body.data.id,'Punknown00000000000000000','${商品订单号}',{},null,'x'.repeat(33)]){
+   const result=await fx.post('/api',{action:'orderByTradeNo',input:{outTradeNo:value}},undefined,buyerHeaders);
+   assert.equal(result.body.error,'ORDER_NOT_FOUND');
+  }
+  const anonymous=await fx.post('/api',request);assert.equal(anonymous.status,401);
+  const login=await fx.post('/auth/login',{username:'owner',password:'owner-test-password'});
+  const merchant=await fx.post('/api',request,login.body.data.token);assert.equal(merchant.status,403);
+  assert.equal(fx.calls.length,calls,'读取详情不得查支付、扣款或退款');
+ }finally{await fx.close();}
+});
+
+test('历史订单跳转在停用支付时仍可读，持久化交易映射不依赖进程缓存',async()=>{
+ const {createWechat}=require('../server/wechat');let reads=0;
+ const gateway=createWechat({settings:{payReady:false},store:{getTrade:async number=>{reads++;return {outTradeNo:number,userId:'wx:buyer',orderId:'o7',payment:{paySign:'private'}};},execute:async(actor,action,input)=>{assert.equal(action,'order');assert.equal(input.id,'o7');return {id:'o7',userId:actor.id,status:'COMPLETED'};}},fetch:()=>{throw Error('unexpected payment request');}});
+ assert.equal((await gateway.orderByTradeNo({id:'wx:buyer',channel:'wechat'},{outTradeNo:'Ptest123456'})).id,'o7');assert.equal(reads,1);
+ await assert.rejects(gateway.orderByTradeNo({id:'wx:other'},{outTradeNo:'Ptest123456'}),/ORDER_NOT_FOUND/);
+});

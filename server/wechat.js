@@ -94,6 +94,18 @@ function createWechat({settings,store,auth,fetch:fetchImpl=global.fetch,now=()=>
     if(!id||typeof id!=='string')throw Error('ORDER_NOT_FOUND');
     return store.execute(actor,'order',{id},{mock:actor.channel!=='wechat'});
   }
+  async function orderByTradeNo(actor,input){
+    // WeChat's ${商品订单号} is out_trade_no, not our internal order ID.
+    // Resolve only for the authenticated buyer; never expose the payment record.
+    if(!actor?.id||actor.merchant)throw Error('FORBIDDEN');
+    const number=input?.outTradeNo;
+    if(typeof number!=='string'||! /^[A-Za-z0-9_-]{6,32}$/.test(number))throw Error('ORDER_NOT_FOUND');
+    const trade=await book.get(number);
+    if(!trade||trade.userId!==actor.id)throw Error('ORDER_NOT_FOUND');
+    const order=await orderOf(actor,trade.orderId);
+    if(order.userId!==actor.id)throw Error('ORDER_NOT_FOUND');
+    return order;
+  }
   async function settle(kind,payload){
     if(kind==='payment'&&typeof store.settlePayment==='function')return store.settlePayment(payload,now());
     if(kind==='refund'&&typeof store.settleRefund==='function')return store.settleRefund(payload,now());
@@ -303,6 +315,6 @@ function createWechat({settings,store,auth,fetch:fetchImpl=global.fetch,now=()=>
     if(url.pathname==='/wechat/refund/notify'&&req.method==='POST'){await refundNotify(req,res);return true;}
     return false;
   }
-  return {handle,createPayment,syncPayment,refund,payReady,missing,book,reconcile};
+  return {handle,createPayment,syncPayment,orderByTradeNo,refund,payReady,missing,book,reconcile};
 }
 module.exports={createWechat,TradeBook};

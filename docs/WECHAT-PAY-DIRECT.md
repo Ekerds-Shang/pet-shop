@@ -64,3 +64,27 @@
 权限报错排查依据：[微信支付小程序常见问题](https://pay.wechatpay.cn/doc/v3/merchant/4012791910)。能力和路径接口依据：[小程序发货信息管理服务](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order-shipping/order-shipping.html)、[小程序购物订单](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order_center/order_center.html)。
 
 官方依据：[小程序下单](https://pay.wechatpay.cn/doc/v3/merchant/4012791897)、[商户订单号查单](https://pay.wechatpay.cn/doc/v3/merchant/4012791900)、[签名验签](https://pay.wechatpay.cn/doc/v3/merchant/4012365342)、[退款通知](https://pay.wechatpay.cn/doc/v3/merchant/4012791906)。
+
+
+### 订单信息录入适配
+
+订单管理的详情路径使用下列完整值（保留占位符，不替换成某个订单号）：
+
+```text
+pages/shop/index?out_trade_no=${商品订单号}
+```
+
+微信替换的值是支付接口的 `out_trade_no`，不是商城内部的订单 ID。服务侧新增只读 `orderByTradeNo` 动作，通过已持久化的支付交易记录定位订单；同时验证登录买家和订单归属。查询不会发起支付、查单或退款，不向小程序返回预支付参数、签名或完整交易记录。支付停用后，历史订单仍可以查看，无需改数据库表。
+
+小程序侧处理冷启动和热启动入口，必要时先登录再打开订单详情；网络失败保留跳转信息供重试。订单链接无效或不属于当前账号时给出提示，不自动下单或拉起收银台。普通订单列表和原下单流程保持兼容。
+
+发布顺序：
+
+1. 发布包含 `orderByTradeNo` 的服务侧代码，保留现有数据库和支付环境变量。
+2. 上传本次小程序侧代码，更新体验版；通过微信订单入口检查本人订单能正确打开。
+3. 在微信公众平台选择正式小程序，进入「支付与交易 → 订单管理 → 订单信息录入」。如显示接入协议，由账号负责人确认后接入，再配置上述详情路径。也可使用官方 `update_order_detail_path` 接口配置；该接口要求事先签署订单中心授权协议，错误 `10060034` 表示需核对协议。
+4. 按账号通知完成必要的代码提审或平台审核，再用真机尝试调起收银台，停在付款确认前。只有真机验证后才能判定权限已恢复；不能仅以路径保存成功宣称解封。
+
+截至本次代码修复，云端尚未发布新接口，微信详情路径尚未修改，支付权限解除仍待验证。发货信息同步和真实资金闭环仍需另外验收。
+
+依据：[微信小程序购物订单官方文档](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order_center/order_center.html) 明确约定详情路径占位符和交易号含义；[微信支付官方常见问题](https://pay.wechatpay.cn/doc/v3/merchant/4012791910) 要求针对 `banned/no permission` 核对交易规范、发货管理及站内通知。[思迅同类故障记录](https://service.sixun.com.cn/KB/KBShareDetail.aspx?Faq_no=J202531200001) 出现相同订单管理接入通知，处理包含订单信息录入和版本审核；其中第三方收单账户、解绑商户等步骤属于该厂商方案，不适用于本项目，不能照搬。
