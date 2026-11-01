@@ -7,18 +7,18 @@ function read(state){
   const saved=state.shopSettings;
   if(saved)return copy(saved);
   return {revision:0,updatedAt:null,store:{name:studio.pickupStore.name,detail:studio.pickupStore.detail,phone:studio.pickupStore.phone},
-    acceptingOrders:true,hours:{days:[1,2,3,4,5,6,7],open:'10:00',close:'20:00',allDay:false,enforce:false},
+    acceptingOrders:true,hours:{days:[1,2,3,4,5,6,7],open:'10:00',close:'00:00',allDay:false,enforce:false},
     pickup:{enabled:true,instructions:'请收到备货完成通知后，凭提货码到店领取。'},
     delivery:{enabled:true,fee:state.shippingFee??800,minimum:0,freeAbove:null,area:'请先与门店确认是否在外送范围内。',estimateMinutes:60,instructions:'由商家安排配送，送出后登记单号或备注。'}};
 }
-function hoursText(hours){return (hours.days.length===7?'每日':hours.days.map(d=>days[d-1]).join('、'))+' '+(hours.allDay?'全天':hours.open+'—'+hours.close);}
+function hoursText(hours){return (hours.days.length===7?'每日':hours.days.map(d=>days[d-1]).join('、'))+' '+(hours.allDay?'全天':hours.open+'—'+(hours.close==='00:00'?'24:00':hours.close));}
 function pickupStore(settings){return {...settings.store,hours:hoursText(settings.hours)};}
 function openNow(settings,now){
   if(!settings.acceptingOrders)return false;
   if(!settings.hours.enforce)return true;
   const date=new Date(now+8*60*60*1000),day=date.getUTCDay()||7,minutes=date.getUTCHours()*60+date.getUTCMinutes();
   const time=value=>Number(value.slice(0,2))*60+Number(value.slice(3));
-  return settings.hours.days.includes(day)&&(settings.hours.allDay||(minutes>=time(settings.hours.open)&&minutes<time(settings.hours.close)));
+  return settings.hours.days.includes(day)&&(settings.hours.allDay||(minutes>=time(settings.hours.open)&&minutes<(settings.hours.close==='00:00'?1440:time(settings.hours.close))));
 }
 function publicSettings(state,now){const settings=read(state);return {...settings,pickupStore:pickupStore(settings),hoursText:hoursText(settings.hours),canOrder:openNow(settings,now),timeZone:'Asia/Shanghai'};}
 function save(state,input,now){
@@ -33,7 +33,7 @@ function save(state,input,now){
   const h=input.hours;need(Array.isArray(h.days)&&h.days.length>0&&h.days.length<=7&&h.days.every(d=>Number.isInteger(d)&&d>=1&&d<=7)&&new Set(h.days).size===h.days.length,'请选择有效且不重复的营业日');
   need([h.open,h.close].every(v=>typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v)),'营业时间格式应为 HH:mm');
   const hours={days:[...h.days].sort(),open:h.open,close:h.close,allDay:bool(h.allDay,'全天营业'),enforce:bool(h.enforce,'营业时间接单限制')};
-  need(hours.allDay||hours.open<hours.close,'结束时间须晚于开始时间；跨夜营业请暂用全天营业');
+  need(hours.allDay||hours.close==='00:00'||hours.open<hours.close,'结束时间须晚于开始时间；跨夜营业请暂用全天营业');
   const pickup={enabled:bool(input.pickup.enabled,'到店自提'),instructions:text(input.pickup.instructions,0,300,'自提说明')};
   const d=input.delivery,delivery={enabled:bool(d.enabled,'商家外送'),fee:amount(d.fee,'外送费'),minimum:amount(d.minimum,'外送起送金额'),freeAbove:d.freeAbove===null?null:amount(d.freeAbove,'免外送费门槛'),area:text(d.area,1,200,'外送范围'),estimateMinutes:d.estimateMinutes,instructions:text(d.instructions,0,300,'外送说明')};
   need(Number.isInteger(delivery.estimateMinutes)&&delivery.estimateMinutes>=1&&delivery.estimateMinutes<=1440,'预计送达时间须为 1 到 1440 分钟');

@@ -52,3 +52,12 @@ test('确认后设置或价格变化拒绝新订单，失败不扣库存，幂�
   const before=structuredClone(f.state);assert.throws(()=>f.call('createOrder',{...input,key:'quote-stale-key'}),/设置已变化/);assert.deepEqual(f.state,before);
   assert.throws(()=>f.call('createOrder',{...input,key:'quote-price-key',settingsRevision:1,expectedTotal:1}),/金额已变化/);assert.deepEqual(f.state,before);
 });
+
+// Midnight is stored as an HTML time-input compatible 00:00.
+test('午夜关店保存为00:00并展示24:00，次日开门前不接单',()=>{
+ const settings=require('../cloudfunctions/shop/shop-settings');
+ const state=domain.seed(),input=settings.read(state);input.store.phone='13800000000';input.hours.enforce=true;input.hours.close='00:00';
+ const saved=settings.save(state,input,0);assert.match(saved.hoursText,/10:00—24:00/);
+ assert.equal(settings.openNow(saved,Date.parse('2026-11-01T15:59:00Z')),true);
+ assert.equal(settings.openNow(saved,Date.parse('2026-11-01T16:00:00Z')),false);
+});

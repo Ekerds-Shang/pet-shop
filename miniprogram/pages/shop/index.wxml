@@ -1,6 +1,6 @@
 <view class="shell">
  <view class="notice">{{mode === 'api' ? '店铺体验 · 不发生真实付款' : (mode === 'mock' ? '本地模式 · 不发生真实付款' : '微信支付')}}</view>
- <view class="brand"><view class="brand-left"><view class="brand-mark">奇</view><view>奇迹空间<text>宠物百货 · 咖啡烘焙</text></view></view><text class="store-tag">单店自营</text></view>
+ <view class="brand"><view class="brand-left"><view class="brand-logo-frame"><image class="brand-logo" src="/assets/kigi-logo.jpg" mode="aspectFit"/></view><view>奇迹空间<text>宠物百货 · 咖啡烘焙</text></view></view><text class="store-tag">单店自营</text></view>
  <view class="nav"><button class="{{tab === 'catalog' ? 'active' : ''}}" data-tab="catalog" bindtap="tab"><image src="/assets/nav-home.png"/>首页</button><button class="{{tab === 'category' ? 'active' : ''}}" data-tab="category" bindtap="tab"><image src="/assets/nav-category.png"/>宠物百货</button><button class="{{tab === 'cart' || tab === 'checkout' ? 'active' : ''}}" data-tab="cart" bindtap="tab"><image src="/assets/nav-cart.png"/>购物车 {{cartCount || ''}}</button><button class="{{tab !== 'catalog' && tab !== 'category' && tab !== 'cart' && tab !== 'checkout' ? 'active' : ''}}" data-tab="account" bindtap="tab"><image src="/assets/nav-account.png"/>个人中心</button></view>
  <view wx:if="{{busy}}" class="request-status">正在处理，请稍候…</view>
  <view wx:if="{{loadError && !loginRequired}}" class="buyer-error"><text>{{loadError}}</text><button size="mini" bindtap="retry" disabled="{{busy}}">重新加载</button></view>
