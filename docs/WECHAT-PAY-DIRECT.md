@@ -47,6 +47,20 @@
 4. 验证通知地址可从公网直达，确认真实业务域名、配置和备份，才开启 `WECHAT_PAY_MODE=direct`。
 5. 真机验收新订单的收银台、实际到账、通知落库、重复通知、退款到账。真实付款由授权人员完成。
 
-2026-10-31 本地只读验证：商户证书与私钥匹配，序列号匹配且证书有效；微信支付查单返回 `404 / ORDER_NOT_EXIST`，指定公钥响应验签通过。APIv3 密钥仅确认长度为 32 字节，尚无真实加密通知验证。未向云端注入密钥，未切换支付模式，未产生真实支付或退款。
+2026-10-31 发布前本地只读验证：商户证书与私钥匹配，序列号匹配且证书有效；微信支付查单返回 `404 / ORDER_NOT_EXIST`，指定公钥响应验签通过。当时尚未向云端注入密钥或切换支付模式。
+
+### 2026-11-01 部署后核验
+
+- 用户已完成云端发布。实测 `/live`、`/health` 返回 200，MySQL 连通，商家登录和商品、订单读取正常。
+- 两个 API v3 通知地址已从 404 变为拒绝无签名请求的 `500 / FAIL`。这证明路由可达并拒绝无效通知，不等于真实通知验签、解密和结算已验收。
+- 本地商户签名只读查单再次返回经验签的 `404 / ORDER_NOT_EXIST`。
+- 使用正式小程序身份调用微信查询接口，`is_trade_managed` 返回 `true`，`is_trade_management_confirmation_completed` 返回 `completed: true`；发货信息管理开通和交易结算确认已完成。
+- `get_order_detail_path` 返回成功，但 `path` 为空，尚未配置购物订单详情跳转路径。
+- 本次真机体验版截图仍显示 `requestPayment:fail jsapi has no permission`，详情为 `jsapi has been banned`。此前账号通知要求接入购物订单，并说明已配置“订单管理—订单信息录入”可忽略通知。应继续核对该账号的接入配置和平台限制，不能仅凭类目申请弹窗认定唯一原因，也不能把以上两项已开通能力与购物订单详情配置混为一谈。
+- 小程序侧移除了商品详情操作区的 `position: fixed` 覆盖和对应额外底部留白，保留原有布局规则；此前真机验收反馈购买按钮不可见，修正后已能继续下单并到达支付调用。
+
+仍待完成：有效的订单详情跳转及商户交易号映射、微信要求的订单/发货同步、真实支付与退款闭环验收。APIv3 密钥尚未通过真实加密通知验证。本次接口排查未发起扣款或退款；不能将当前状态标记为支付上线验收通过。
+
+权限报错排查依据：[微信支付小程序常见问题](https://pay.wechatpay.cn/doc/v3/merchant/4012791910)。能力和路径接口依据：[小程序发货信息管理服务](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order-shipping/order-shipping.html)、[小程序购物订单](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order_center/order_center.html)。
 
 官方依据：[小程序下单](https://pay.wechatpay.cn/doc/v3/merchant/4012791897)、[商户订单号查单](https://pay.wechatpay.cn/doc/v3/merchant/4012791900)、[签名验签](https://pay.wechatpay.cn/doc/v3/merchant/4012365342)、[退款通知](https://pay.wechatpay.cn/doc/v3/merchant/4012791906)。
